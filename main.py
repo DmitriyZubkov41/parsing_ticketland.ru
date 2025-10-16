@@ -1,66 +1,34 @@
 import logging
 from time import time, sleep
+import csv
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service as ChromeService
+#from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager
-import csv
 from pathlib import Path
 
 
-def open_page(browser, url, locator):
-    # print(f"Открываем страницу по адресу {url}")
-    count = 1
-    while True:
-        try:
-            browser.set_page_load_timeout(40)
-            browser.get(url)
-            # Страница может не успеть загрузиться и browser посчитает что мест нет
-            # чтобы этого не произошло будем проверять что загрузился locator
-            try:
-                WebDriverWait(browser, 20).until(
-                    EC.presence_of_element_located(locator)
-                )
-            except:
-                # Если присутствует этот элемент div class="row error-page__error-text"
-                # то 404 и переходим к следующему пункту
-                if browser.find_elements(
-                    By.CSS_SELECTOR, 'div[class="row error-page__error-text"]'
-                ):
-                    # print("Получена ошибка 404")
-                    logging.info(f"Получена ошибка 404 на {url}")
-                    break
-                else:
-                    # print("Страница не успела загрузиться, снова загрузим ее")
-                    continue
-
-            # print("Получили страницу")
-            break
-        except Exception as e:
-            count += 1
-            # print(e)
-            # print(f"Не удалось загрузить страницу по адресу: {url}\nпопытка №{count} открыть страницу через 5 секунд")
-            logging.info("Не загрузили страницу, новая попытка")
-            logging.info(e)
-            sleep(5)
-            continue
-    return browser
-
-
 def write_csv(parent_dir, tickets):
+    """
+    Запись в tickets.csv
+    """
     path_table = parent_dir / "tickets.csv"
     path_table = path_table.resolve()
     with open(path_table, "w", newline="") as file_csv:
         writer = csv.writer(file_csv, delimiter=";")
-        writer.writerow(["Мероприятие", "Дата", "Сектор", "Ряд", "Место", "Цена"])
+        writer.writerow(["Мероприятие", "Дата", "Время", "Сектор", "Ряд", "Место", "Цена"])
         for element in tickets:
             writer.writerow(
                 [
+
                     element["name"],
                     element["date"],
+                    element["time"],
                     element["sector"],
                     f"ряд {element['row']}",
                     f"место {element['seat']}",
@@ -69,11 +37,44 @@ def write_csv(parent_dir, tickets):
             )
 
 
+def open_page(browser, url, locator):
+    count = 1
+    while True:
+        print(f"Попытка номер{count}, открываем страницу по адресу {url}")
+        try:
+            # Установить таймаут на загрузку страницы
+            browser.set_page_load_timeout(50)
+            browser.get(url)
+            print("Получили страницу")
+            # Страница может не успеть загрузиться и browser посчитает что мест нет
+            # чтобы этого не произошло будем проверять что загрузился locator
+            try:
+                WebDriverWait(browser, 20).until(
+                    EC.presence_of_element_located(locator)
+                )
+                return browser
+            except:
+                # Если присутствует этот элемент div class="row error-page__error-text"
+                # то 404 и переходим к следующему пункту
+                try:
+                    browser.find_elements(By.CSS_SELECTOR, 'div[class="row error-page__error-text"]')
+                    print("Получена ошибка 404")
+                    return browser
+                except:
+                    count +=1
+                    continue
+        except Exception as e:
+            count +=1
+            continue
+    return browser
+
+
 def parsing_selenium():
-    """ "
+    """
     Парсинг сайта ticketland.ru с помощью библиотеки Selenium
     Возвращает список tickets с нужными данными
     """
+    # Настройки браузера
     options = Options()
     # options.add_argument("--headless") # без запуска браузера
     # чтобы не обнаружили что браузер управляется webdriver
@@ -84,9 +85,9 @@ def parsing_selenium():
     browser = webdriver.Chrome(
         service=ChromeService(ChromeDriverManager().install()), options=options
     )
-
+    
     locator = (By.CSS_SELECTOR, 'a[class="card__title pb-1 pt-1"]')
-
+         
     open_page(
         browser, "https://www.ticketland.ru/cirki/bolshoy-moskovskiy-cirk/", locator
     )
@@ -97,7 +98,7 @@ def parsing_selenium():
     event_urls = [teg_a.get_attribute("href") for teg_a in list_a]
     # Переходим по ссылке из списка событий event_urls:
     tickets = []
-    for url in event_urls[:1]:
+    for url in event_urls:
         locator = (By.CSS_SELECTOR, 'div[class="show-card__col show-card__col--end"]')
         open_page(browser, url, locator)
         # Перешли на страницу мероприятия, теперь получим список ссылок на даты, когда это мероприятие проходит
@@ -114,7 +115,6 @@ def parsing_selenium():
                 teg_a_href = teg_a[0].get_attribute("href")
                 url_list.append(teg_a_href)
 
-        # print("Количество дат, когда пройдет это событие=", len(url_list))
         # Получили список ссылок на даты мероприятий, теперь будем последовательно эти ссылки открывать
         for url in url_list[:1]:
             locator = (By.CSS_SELECTOR, 'g[class="places"]')
@@ -126,64 +126,66 @@ def parsing_selenium():
                 By.CSS_SELECTOR, 'h1[class="mts-compact text-medium lh-28"]'
             ).text[:-2]
             # Дата div class="text-medium mr-2"
-            event_date = browser.find_element(
+            lst_date = browser.find_element(
                 By.CSS_SELECTOR, 'div[class="text-medium mr-2"]'
-            ).text
-            # Места в теге rect
+            ).text.split(',')
             # Наличие билета и его стоимость определяется атрибутом тега rect data-price
+            # <rect id="p33178947" class="place" x="3034" y="2743" width="16" height="16" rx="6" sectionId="16916"            
+            #                                                   section="Сектор Е" row="2" seat="14"></rect>
             places = browser.find_elements(By.TAG_NAME, "rect")
-            count = 0
+            #count = 0
             for place in places:
                 if place.get_attribute("data-price"):
-                    count += 1
+                    #count += 1
                     # Запишем данные этого места в список tickets
-                    sector = place.get_attribute("data-section-name")
+                    sector = place.get_attribute("section")
                     row = place.get_attribute("row")
                     seat = place.get_attribute("seat")
                     price = place.get_attribute("data-price")
                     tickets.append(
                         {
-                            "name": name,
-                            "date": event_date,
+                            "name":   name,
+                            "date":   lst_date[0][3:],
+                            "time":   lst_date[1][1:],
                             "sector": sector,
-                            "row": row,
-                            "seat": seat,
-                            "price": price,
+                            "row":    row,
+                            "seat":   seat,
+                            "price":  price,
                         }
                     )
-                    # print(f"Номер билета={count}, sector = {sector}, ряд = {row}, место = {seat}, цена = {price}")
+                    
     browser.quit()
     return tickets
+
+def settings_log(parent_dir):
+    """
+    Настройки логирования
+    """
+    path_log = parent_dir / "log.log"
+    path_log = path_log.resolve()
+    level_log = "DEBUG"
+    logging.basicConfig(
+        filename=path_log,
+        level=level_log,
+        format="%(asctime)s -- %(levelname)s -- %(message)s",
+    )
 
 
 def main():
     start_time = time()
-
     parent_dir = Path(__file__).parent
-    path_log = parent_dir / "log.log"
-    path_log = path_log.resolve()
-    logging.basicConfig(
-        filename=path_log,
-        format="%(asctime)s -- %(levelname)s -- %(message)s",
-        level=logging.INFO,
-    )
-    logging.info(
-        f"___________________________Запуск программы_________________________________________"
-    )
 
+    settings_log(parent_dir)
+    
     tickets = parsing_selenium()
 
     write_csv(parent_dir, tickets)
-    # print("Всего строк с местами =", len(tickets))
+    print("Всего строк с местами =", len(tickets))
 
     end_time = time()
     hours = int(round(end_time - start_time, 0)) // 3600
     minutes = (int(round(end_time - start_time, 0)) % 3600) // 60
 
-    # print(f"Время, потраченное на выполнение программы: {hours} часов и {minutes} минут")
-    logging.info(
-        f"Время, потраченное на выполнение программы: {hours} часов и {minutes} минут"
-    )
-
-
+    print(f"Время, потраченное на выполнение программы: {hours} часов и {minutes} минут")
+    
 main()
