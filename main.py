@@ -8,7 +8,6 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service as ChromeService
-#from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager
 from pathlib import Path
 
@@ -116,7 +115,7 @@ def parsing_selenium():
                 url_list.append(teg_a_href)
 
         # Получили список ссылок на даты мероприятий, теперь будем последовательно эти ссылки открывать
-        for url in url_list[:1]:
+        for url in url_list:
             locator = (By.CSS_SELECTOR, 'g[class="places"]')
             open_page(browser, url, locator)
 
