@@ -14,17 +14,18 @@ from pathlib import Path
 
 def write_csv(parent_dir, tickets):
     """
-    Запись в tickets.csv
+    Записать список tickets в tickets.csv
     """
     path_table = parent_dir / "tickets.csv"
     path_table = path_table.resolve()
     with open(path_table, "w", newline="") as file_csv:
         writer = csv.writer(file_csv, delimiter=";")
-        writer.writerow(["Мероприятие", "Дата", "Время", "Сектор", "Ряд", "Место", "Цена"])
+        writer.writerow(
+            ["Мероприятие", "Дата", "Время", "Сектор", "Ряд", "Место", "Цена"]
+        )
         for element in tickets:
             writer.writerow(
                 [
-
                     element["name"],
                     element["date"],
                     element["time"],
@@ -56,14 +57,16 @@ def open_page(browser, url, locator):
                 # Если присутствует этот элемент div class="row error-page__error-text"
                 # то 404 и переходим к следующему пункту
                 try:
-                    browser.find_elements(By.CSS_SELECTOR, 'div[class="row error-page__error-text"]')
+                    browser.find_elements(
+                        By.CSS_SELECTOR, 'div[class="row error-page__error-text"]'
+                    )
                     print("Получена ошибка 404")
                     return browser
                 except:
-                    count +=1
+                    count += 1
                     continue
         except Exception as e:
-            count +=1
+            count += 1
             continue
     return browser
 
@@ -84,9 +87,9 @@ def parsing_selenium():
     browser = webdriver.Chrome(
         service=ChromeService(ChromeDriverManager().install()), options=options
     )
-    
+
     locator = (By.CSS_SELECTOR, 'a[class="card__title pb-1 pt-1"]')
-         
+
     open_page(
         browser, "https://www.ticketland.ru/cirki/bolshoy-moskovskiy-cirk/", locator
     )
@@ -115,7 +118,7 @@ def parsing_selenium():
                 url_list.append(teg_a_href)
 
         # Получили список ссылок на даты мероприятий, теперь будем последовательно эти ссылки открывать
-        for url in url_list:
+        for url in url_list[:1]:
             locator = (By.CSS_SELECTOR, 'g[class="places"]')
             open_page(browser, url, locator)
 
@@ -127,15 +130,15 @@ def parsing_selenium():
             # Дата div class="text-medium mr-2"
             lst_date = browser.find_element(
                 By.CSS_SELECTOR, 'div[class="text-medium mr-2"]'
-            ).text.split(',')
+            ).text.split(",")
             # Наличие билета и его стоимость определяется атрибутом тега rect data-price
-            # <rect id="p33178947" class="place" x="3034" y="2743" width="16" height="16" rx="6" sectionId="16916"            
+            # <rect id="p33178947" class="place" x="3034" y="2743" width="16" height="16" rx="6" sectionId="16916"
             #                                                   section="Сектор Е" row="2" seat="14"></rect>
             places = browser.find_elements(By.TAG_NAME, "rect")
-            #count = 0
+            # count = 0
             for place in places:
                 if place.get_attribute("data-price"):
-                    #count += 1
+                    # count += 1
                     # Запишем данные этого места в список tickets
                     sector = place.get_attribute("section")
                     row = place.get_attribute("row")
@@ -143,18 +146,19 @@ def parsing_selenium():
                     price = place.get_attribute("data-price")
                     tickets.append(
                         {
-                            "name":   name,
-                            "date":   lst_date[0][3:],
-                            "time":   lst_date[1][1:],
+                            "name": name,
+                            "date": lst_date[0][3:],
+                            "time": lst_date[1][1:],
                             "sector": sector,
-                            "row":    row,
-                            "seat":   seat,
-                            "price":  price,
+                            "row": row,
+                            "seat": seat,
+                            "price": price,
                         }
                     )
-                    
+
     browser.quit()
     return tickets
+
 
 def settings_log(parent_dir):
     """
@@ -162,7 +166,7 @@ def settings_log(parent_dir):
     """
     path_log = parent_dir / "log.log"
     path_log = path_log.resolve()
-    level_log = "DEBUG"
+    level_log = "WARNING"
     logging.basicConfig(
         filename=path_log,
         level=level_log,
@@ -175,7 +179,7 @@ def main():
     parent_dir = Path(__file__).parent
 
     settings_log(parent_dir)
-    
+
     tickets = parsing_selenium()
 
     write_csv(parent_dir, tickets)
@@ -185,6 +189,9 @@ def main():
     hours = int(round(end_time - start_time, 0)) // 3600
     minutes = (int(round(end_time - start_time, 0)) % 3600) // 60
 
-    print(f"Время, потраченное на выполнение программы: {hours} часов и {minutes} минут")
-    
+    print(
+        f"Время, потраченное на выполнение программы: {hours} часов и {minutes} минут"
+    )
+
+
 main()
